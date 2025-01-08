@@ -26,7 +26,8 @@ void swap_usage(void){
 	}
 
 	line();
-	rows("SWAP", "", "", "usage", "", "");
+	flush();
+	rows("SWAP", " ", " ", "usage", " ", " ");
 	line();
 	progress_bar(si.totalswap, si.totalswap - si.freeswap);
 	line();

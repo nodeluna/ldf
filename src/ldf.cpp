@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <ranges>
 #include <filesystem>
 #include <mntent.h>
 #include <cstring>
@@ -12,6 +13,7 @@
 #include "about.h"
 #include "ldf.h"
 #include "term.h"
+
 
 int fill = 22;
 
@@ -34,7 +36,8 @@ std::vector<mnt> get_devices(void){
 	while((mntent = getmntent(mnt_fp)) != NULL){
 		pmnt.dev = mntent->mnt_fsname;
 		pmnt.mount = mntent->mnt_dir;
-		if(include_dev(pmnt.dev))
+		pmnt.type = mntent->mnt_type;
+		if(include_dev(pmnt.dev) && std::ranges::find(devs, pmnt) == devs.end())
 			devs.push_back(pmnt);
 	}
 	
@@ -43,7 +46,15 @@ std::vector<mnt> get_devices(void){
 }
 
 void line(void){
-	std::cout << std::left << std::setw(terminal_size().ws_col) << std::setfill('-') << ""  << std::setfill(' ') << "\n";
+	std::string l;
+	for(size_t i = 0 ; i < terminal_size().ws_col; i++){
+		l += "━";
+	}
+	std::cout << l << "\n";
+}
+
+void flush(void){
+	std::cout << std::left << std::setw(terminal_size().ws_col) << std::setfill(' ') << ""  << std::setfill(' ') << "\r";
 }
 
 void rows(const std::string& dev, const std::string& size, const std::string& used, const std::string& available, 
@@ -60,9 +71,10 @@ void rows(const std::string& dev, const std::string& size, const std::string& us
 
 void ldf(const std::vector<mnt>& devs){
 	struct winsize w = terminal_size();
-	fill = w.ws_col / 6;
+	constexpr int columns = 6;
+	fill = w.ws_col / columns;
 	line();
-	rows("device", "size", "used", "availabe", "usage %", "mounted on");
+	rows("device", "size", "used", "availabe", "usage", "mounted on");
 	line();
 
 	std::uintmax_t size = 0, used = 0, available = 0;
@@ -70,7 +82,7 @@ void ldf(const std::vector<mnt>& devs){
 		std::filesystem::space_info si = std::filesystem::space(dev.mount);
 
 		rows(dev.dev, size_units(si.capacity), size_units(si.capacity - si.available), size_units(si.available),
-				decimal_precision(percentage(si.capacity - si.available, si.capacity), 2), dev.mount);
+				decimal_precision(percentage(si.capacity - si.available, si.capacity), 2) + " %", dev.mount);
 
 		size += si.capacity;
 		used += (si.capacity - si.available);
@@ -78,6 +90,6 @@ void ldf(const std::vector<mnt>& devs){
 	}
 
 	line();
-	rows("total", size_units(size), size_units(used), size_units(available), decimal_precision(percentage(used, size), 2), "-");
+	rows("total", size_units(size), size_units(used), size_units(available), decimal_precision(percentage(used, size), 2) + " %", "-");
 	line();
 }
